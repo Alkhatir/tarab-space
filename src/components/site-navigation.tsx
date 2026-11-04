@@ -10,6 +10,7 @@ export function SiteNavigation() {
     <nav aria-label="Main navigation" className="flex items-center gap-6 text-sm font-medium">
       {[
         { href: "/", label: "Discover" },
+        { href: "/submit", label: "Share music" },
         { href: "/about", label: "About" },
       ].map(({ href, label }) => (
         <Link
