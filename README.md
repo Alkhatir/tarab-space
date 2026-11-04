@@ -2,7 +2,7 @@
 
 **Tarab Space** is a community-driven music platform for members of [r/syrian-social-space](https://www.reddit.com/r/syrian-social_space/).
 
-The idea is simple: community members sign in with their Reddit account, submit music they enjoy, assign genres or tags, and Tarab Space automatically organizes those submissions into collaborative Spotify playlists.
+The intended experience: community members sign in with Reddit, find a Spotify recording, personalize its tags, and submit it to a shared music library. Tracks are automatically grouped into overlapping clusters, with qualifying clusters synchronized to Spotify playlists. These integrations are planned; the current application is a credential-independent interface preview.
 
 The project aims to turn the musical taste of the community into a collection of continuously evolving playlists.
 
@@ -16,28 +16,10 @@ Tarab Space connects three things:
 
 **Reddit community → Music submissions → Spotify playlists**
 
-A user authenticates using Reddit, submits a song and its genre, and Tarab Space handles organizing the music into the appropriate playlist.
-
-For example:
+A user will authenticate using Reddit, select a Spotify recording, review its metadata and editable tags, and submit it. One track may belong to several clusters and therefore appear in several playlists.
 
 ```text
-r/syrian-social-space
-        │
-        ▼
-   Reddit Login
-        │
-        ▼
-   Tarab Space
-        │
-        ├── Arabic Pop
-        ├── Tarab
-        ├── Rock
-        ├── Jazz
-        ├── Metal
-        └── Electronic
-                │
-                ▼
-        Spotify Playlists
+Reddit identity → Shared track library → Overlapping clusters → Spotify playlists
 ```
 
 The goal is to create playlists that reflect the musical diversity of the community rather than the taste of a single curator.
@@ -62,55 +44,48 @@ The goal is to create playlists that reflect the musical diversity of the commun
 
 ## 🔄 Planned Flow
 
-### 1. Authenticate
+### 1. Find a recording
 
-Users log in using their Reddit account through Reddit OAuth.
+Paste a Spotify track URL, or search by song title or musician. Once the live integration exists, Spotify search will suggest recordings; selecting one will populate title, artist information, and available metadata. Credentials and live requests are deferred.
 
-```text
-User
-  ↓
-Reddit OAuth
-  ↓
-Tarab Space
-```
+### 2. Personalize tags
 
-Reddit authentication provides an identity for each contributor and can later be used as part of the community eligibility system.
+Spotify metadata stays separate from user-edited tags. Users can remove, edit, or add suggested tags before submission, including starting with no suggestions. Spotify's [track response](https://developer.spotify.com/documentation/web-api/reference/get-track) does not include track-level genres. [Artist genres](https://developer.spotify.com/documentation/web-api/reference/get-an-artist), where available, are only suggestions and may be empty or unsuitable for the recording.
 
-### 2. Submit Music
+### 3. Publish without duplicates
 
-Authenticated users can submit a song and select or suggest a genre.
+After a successful database save, the track appears immediately; there is no approval queue. A PostgreSQL uniqueness constraint on Spotify track ID will prevent duplicate library entries even for concurrent submissions. A duplicate submission will point to the existing entry rather than create another.
 
-A submission could contain information such as:
+Different Spotify IDs can represent different releases of the same recording. Cross-release deduplication remains a separate future decision; a title/artist text comparison will not be treated as a reliable unique identity. How later users can propose tag changes to an existing entry also remains to be defined.
 
-```text
-Track: ...
-Artist: ...
-Spotify ID: ...
-Genre: ...
-Submitted by: u/username
-```
+### 4. Group automatically
 
-### 3. Classify
+Tracks can belong to multiple clusters based on shared properties such as normalized tags and artists. Begin with transparent, deterministic grouping rules; do not choose an exclusive, single-cluster algorithm. A new track may create, change, split, or merge clusters. Exact similarity thresholds and weighting will be evaluated against real submissions.
 
-Tarab Space associates the track with its genre or tags.
+AI is a possible future research direction, not a committed dependency. Spotify's [Developer Policy](https://developer.spotify.com/policy) prohibits ingesting Spotify content into AI/ML models. Do not send Spotify metadata, artwork, or audio into embeddings, LLMs, or model training. Any future AI approach needs a permitted independent data source and review of applicable terms. Rule-based grouping is the initial design, not a claim that arbitrary processing or retention of Spotify content is permitted.
 
-Where useful, metadata obtained from Spotify can help with classification and track identification.
+### 5. Synchronize playlists
 
-### 4. Build Playlists
-
-Each supported genre can correspond to a Spotify playlist.
+- A cluster qualifies at **six distinct tracks** (more than five).
+- A track may appear in multiple playlists through overlapping membership, but appears only once within each playlist.
+- Playlist names reflect dominant tags, artists, or both, with a stable identifier to distinguish similarly named clusters.
+- PostgreSQL is the source of truth. Spotify playlists are synchronized external representations.
+- Save and publish the submission first; clustering and Spotify synchronization run afterward in small, retryable background batches. A Spotify failure must not discard the saved submission.
+- Reconcile the desired playlist contents with Spotify rather than blindly appending tracks on each retry.
+- Preserve playlist IDs and URLs when a cluster has a clear successor. Splits and merges may require creating new qualifying playlists and retiring superseded ones.
+- The exact retirement behavior for vanished clusters or clusters falling below six tracks is still to be defined before implementing synchronization. Do not automatically delete playlists as an implicit default.
 
 ```text
-Genre                 Spotify Playlist
-─────────────────────────────────────────
-Tarab          →      Tarab Space — Tarab
-Arabic Pop     →      Tarab Space — Arabic Pop
-Rock           →      Tarab Space — Rock
-Jazz           →      Tarab Space — Jazz
-Electronic     →      Tarab Space — Electronic
+URL or title/artist search
+          ↓
+Select recording → Metadata + editable tags
+          ↓
+Unique database save → Immediately visible in Discover
+          ↓
+Recalculate affected overlapping clusters
+          ↓
+Reconcile Spotify playlists for qualifying clusters
 ```
-
-When accepted songs are added to Tarab Space, the corresponding Spotify playlists can be updated automatically.
 
 ---
 
@@ -130,13 +105,25 @@ The foundation uses TypeScript strict mode, React, Tailwind CSS, ESLint, pnpm, a
 
 External integrations will be implemented incrementally. Their boundaries live in `src/lib/reddit`, `src/lib/spotify`, and `src/lib/supabase`. Shared UI components and domain types can be added to `src/components` and `src/types` when needed.
 
-Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. OAuth, eligibility checks, database schema, queries, and playlist synchronization are not implemented.
+Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, a submission-interface preview at `/submit`, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. OAuth, live Spotify lookup, eligibility checks, database schema, saving, duplicate enforcement, clustering, and playlist synchronization are not implemented.
 
 ### Discover preview
 
 The homepage uses explicitly labeled sample music from `src/lib/demo/tracks.ts`. Tags are illustrative and are not Spotify metadata or clustering results. Search matches track titles, artists, and tags; tag filters combine with search, and filters can be reset from the results or empty state. Track links open Spotify search, not a verified recording or an integrated player.
 
 The layout and pages are Server Components; interactive navigation and discovery controls use small client components in `src/components`. No credentials, database, external requests, or new dependencies are needed. Sample data and its presentation type are temporary UI fixtures, not a contract for the eventual metadata, clustering, or playlist workflow.
+
+### Submission preview
+
+`/submit` provides local sample search by title or artist, Spotify track URL validation, recording selection, read-only sample metadata, an editable tag list, and a draft review. URL validation never fetches metadata or associates a URL with an unrelated sample. The final submission button is disabled and nothing is persisted, including across reloads.
+
+- UI: `src/components/submission/`; the page itself remains a Server Component.
+- Fixtures: `src/lib/demo/tracks.ts`, separate from integration code and eventual domain contracts.
+- Browser-safe Zod validation: `src/lib/submissions/validation.ts`.
+- Preview limits: up to 12 tags, each 1–40 characters after trimming and whitespace normalization. Tags can be removed entirely; duplicate tags are rejected ignoring case, Unicode compatibility differences, and extra spaces. These are initial UI limits, not a database schema.
+- Full HTTPS Spotify track URLs, including supported `intl-xx` paths and sharing query strings, are recognized. Album, artist, playlist, URI, and shortened-link resolution are deferred.
+- A new tag must be added or cleared before reviewing. Selecting a different recording starts a fresh draft; same-recording selection preserves edits.
+- There are no mock production endpoints, fake successful submissions, external requests, or browser storage. Live lookup and saving remain unavailable until connected.
 
 ---
 
@@ -187,47 +174,44 @@ while still supporting international genres such as rock, metal, jazz, hip-hop, 
 
 ## 🗺️ Roadmap
 
-### Phase 1 — Foundation
+### Phase 1 — Foundation and interface previews
 
-- [x] Set up application structure
-- [ ] Configure database
-- [ ] Implement Reddit OAuth
-- [ ] Create user model
-- [x] Create basic frontend
+- [x] Set up the Next.js modular monolith
+- [x] Shared responsive layout and About page
+- [x] Discover preview with sample search and tag filtering
+- [x] Submission preview with recording selection and editable tags
+- [x] Document the agreed lifecycle and integration boundaries
 
-### Phase 2 — Music Submission
+### Phase 2 — Persistence and identity
 
-- [ ] Integrate Spotify API
-- [ ] Search Spotify tracks
-- [ ] Submit tracks
-- [ ] Store track metadata
-- [ ] Add genre selection
-- [ ] Detect duplicate submissions
+- [ ] Versioned SQL migrations and database authorization model
+- [ ] Reddit authentication, sessions, and user model
+- [ ] Persist unique track submissions with immediate visibility
+- [ ] Connect Discover to stored submissions
+- [ ] Decide who may edit tags on existing entries
+- [ ] Define subreddit eligibility rules before public access
 
-### Phase 3 — Playlist Automation
+### Phase 3 — Live Spotify lookup
 
-- [ ] Create Spotify playlists automatically
-- [ ] Map genres to playlists
-- [ ] Add accepted tracks to playlists
-- [ ] Synchronize database and Spotify playlists
-- [ ] Handle removed or unavailable tracks
+- [ ] Configure credentials and verify API access
+- [ ] Search by title/artist and resolve Spotify track URLs
+- [ ] Populate recording metadata and optional artist-genre suggestions
+- [ ] Add rate-limit handling, failures, and server-side validation
 
-### Phase 4 — Community Features
+### Phase 4 — Grouping and synchronization
 
-- [ ] Implement subreddit activity/eligibility rules
-- [ ] Add moderation tools
-- [ ] Add voting or approval system
-- [ ] Allow community-generated genres/tags
-- [ ] Add user contribution history
+- [ ] Implement and evaluate deterministic overlapping grouping
+- [ ] Track cluster identities and membership revisions
+- [ ] Create playlists at six distinct tracks
+- [ ] Generate descriptive, distinguishable playlist names
+- [ ] Reconcile playlist contents through retryable background work
+- [ ] Handle splits, merges, unavailable tracks, and retirement rules
 
-### Phase 5 — Discovery
+### Later possibilities
 
-- [ ] Browse community submissions
-- [ ] Search by artist or genre
-- [ ] Community statistics
-- [ ] Most submitted artists
-- [ ] Trending tracks
-- [ ] Playlist discovery page
+- Cross-release deduplication
+- Community statistics and playlist discovery
+- AI-assisted grouping only with permitted data and reviewed terms
 
 ---
 
@@ -240,7 +224,7 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3000. No external credentials or environment file are needed for the landing page or health endpoint.
+Open http://localhost:3000. No external credentials or environment file are needed for Discover (`/`), About (`/about`), the submission preview (`/submit`), or the health endpoint.
 
 ```bash
 pnpm lint
@@ -251,7 +235,7 @@ pnpm start
 
 `pnpm start` serves the production build. Health check: `GET /api/health` returns `{"status":"ok","service":"tarab-space"}`.
 
-The next milestone is to define how submitted music metadata, clustering, and playlist creation should work before implementing those integrations. Reddit authentication and the user model remain planned. Deployment configuration is intentionally deferred.
+Next, define versioned database migrations and authorization around the agreed workflow, then connect persistence and identity. Reddit and Spotify credentials, live integrations, and deployment configuration remain deferred. Before deployment, address the existing Next.js security advisory reported by the development/build tooling.
 
 ---
 
