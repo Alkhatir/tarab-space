@@ -60,7 +60,7 @@ The goal is to create playlists that reflect the musical diversity of the commun
 
 ---
 
-## 🔄 How It Works
+## 🔄 Planned Flow
 
 ### 1. Authenticate
 
@@ -116,40 +116,27 @@ When accepted songs are added to Tarab Space, the corresponding Spotify playlist
 
 ## 🏗️ Architecture
 
-The exact stack is still being developed, but the application will roughly consist of:
+Tarab Space starts as a modular monolith. Next.js provides both the frontend (Server Components by default) and backend (Route Handlers) in one application.
 
 ```text
-                    ┌──────────────────┐
-                    │      Reddit      │
-                    │      OAuth       │
-                    └────────┬─────────┘
-                             │
-                             ▼
-┌──────────────┐     ┌──────────────────┐
-│              │     │                  │
-│   Frontend   │────▶│  Tarab Space API │
-│              │     │                  │
-└──────────────┘     └────────┬─────────┘
-                              │
-                       ┌──────┴──────┐
-                       │             │
-                       ▼             ▼
-                ┌────────────┐ ┌────────────┐
-                │  Database  │ │ Spotify API│
-                └────────────┘ └──────┬─────┘
-                                      │
-                                      ▼
-                               ┌─────────────┐
-                               │  Playlists  │
-                               └─────────────┘
+Next.js
+   │
+   ├── Reddit API / OAuth
+   ├── Spotify Web API
+   └── Supabase PostgreSQL
 ```
 
-### External APIs
+The foundation uses TypeScript strict mode, React, Tailwind CSS, ESLint, pnpm, and Zod. PostgreSQL will be the source of truth; Spotify playlists will be an external synchronized representation. Reddit will provide the primary user identity, rather than Supabase Auth.
 
-Tarab Space is expected to integrate with:
+External integrations will be implemented incrementally. Their boundaries live in `src/lib/reddit`, `src/lib/spotify`, and `src/lib/supabase`. Shared UI components and domain types can be added to `src/components` and `src/types` when needed.
 
-- **Reddit API** — authentication and Reddit account identity
-- **Spotify Web API** — track metadata and playlist management
+Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. OAuth, eligibility checks, database schema, queries, and playlist synchronization are not implemented.
+
+### Discover preview
+
+The homepage uses explicitly labeled sample music from `src/lib/demo/tracks.ts`. Tags are illustrative and are not Spotify metadata or clustering results. Search matches track titles, artists, and tags; tag filters combine with search, and filters can be reset from the results or empty state. Track links open Spotify search, not a verified recording or an integrated player.
+
+The layout and pages are Server Components; interactive navigation and discovery controls use small client components in `src/components`. No credentials, database, external requests, or new dependencies are needed. Sample data and its presentation type are temporary UI fixtures, not a contract for the eventual metadata, clustering, or playlist workflow.
 
 ---
 
@@ -202,11 +189,11 @@ while still supporting international genres such as rock, metal, jazz, hip-hop, 
 
 ### Phase 1 — Foundation
 
-- [ ] Set up application structure
+- [x] Set up application structure
 - [ ] Configure database
 - [ ] Implement Reddit OAuth
 - [ ] Create user model
-- [ ] Create basic frontend
+- [x] Create basic frontend
 
 ### Phase 2 — Music Submission
 
@@ -246,39 +233,37 @@ while still supporting international genres such as rock, metal, jazz, hip-hop, 
 
 ## 💻 Development
 
-The project is currently under active development.
-
-Clone the repository:
+Use Node.js 20.9 or newer and pnpm (the exact package manager version is recorded in package.json).
 
 ```bash
-git clone https://github.com/<username>/tarab-space.git
-cd tarab-space
+pnpm install
+pnpm dev
 ```
 
-Installation and local development instructions will be added once the initial application stack has been finalized.
+Open http://localhost:3000. No external credentials or environment file are needed for the landing page or health endpoint.
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm start
+```
+
+`pnpm start` serves the production build. Health check: `GET /api/health` returns `{"status":"ok","service":"tarab-space"}`.
+
+The next milestone is to define how submitted music metadata, clustering, and playlist creation should work before implementing those integrations. Reddit authentication and the user model remain planned. Deployment configuration is intentionally deferred.
 
 ---
 
 ## 🔑 Environment Variables
 
-Tarab Space will require credentials for its external services.
+Copy `.env.example` to `.env.local` when configuring integrations; never commit credentials. All environment files are ignored except `.env.example`.
 
-A future `.env` configuration may look similar to:
+`src/lib/env.ts` is server-only. Call `getIntegrationEnv("reddit" | "spotify" | "supabase" | "session")` only when the corresponding feature needs it. Missing or invalid values raise an error naming the variables without printing their values. Session configuration requires a secret of at least 32 characters.
 
-```env
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-REDDIT_REDIRECT_URI=
+Only `NEXT_PUBLIC_` values may be referenced by browser code. These values are public, including the Supabase publishable key. OAuth client secrets and session secrets must stay on the server. `NEXT_PUBLIC_APP_URL` is reserved for future application links; it is not required by the current page.
 
-SPOTIFY_CLIENT_ID=
-SPOTIFY_CLIENT_SECRET=
-SPOTIFY_REDIRECT_URI=
-
-DATABASE_URL=
-SESSION_SECRET=
-```
-
-Never commit API secrets or production credentials to the repository.
+The Supabase constructor is server-only and uses the publishable key with anonymous-role permissions; database authorization and row-level security must be designed before data access is added.
 
 ---
 
