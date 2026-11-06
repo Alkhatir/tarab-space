@@ -7,11 +7,12 @@ export function SiteNavigation() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Main navigation" className="flex items-center gap-6 text-sm font-medium">
+    <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-medium">
       {[
         { href: "/", label: "Discover" },
         { href: "/submit", label: "Share music" },
         { href: "/about", label: "About" },
+        { href: "/account", label: "Account" },
       ].map(({ href, label }) => (
         <Link
           key={href}

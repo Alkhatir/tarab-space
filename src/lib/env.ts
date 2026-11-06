@@ -10,18 +10,10 @@ const schemas = {
     NEXT_PUBLIC_SUPABASE_URL: requiredUrl,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: requiredString,
   }),
-  reddit: z.object({
-    REDDIT_CLIENT_ID: requiredString,
-    REDDIT_CLIENT_SECRET: requiredString,
-    REDDIT_REDIRECT_URI: requiredUrl,
-  }),
   spotify: z.object({
     SPOTIFY_CLIENT_ID: requiredString,
     SPOTIFY_CLIENT_SECRET: requiredString,
     SPOTIFY_REDIRECT_URI: requiredUrl,
-  }),
-  session: z.object({
-    SESSION_SECRET: z.string().min(32),
   }),
 };
 

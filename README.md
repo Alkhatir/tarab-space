@@ -2,7 +2,7 @@
 
 **Tarab Space** is a community-driven music platform for members of [r/syrian-social-space](https://www.reddit.com/r/syrian-social_space/).
 
-The intended experience: community members sign in with Reddit, find a Spotify recording, personalize its tags, and submit it to a shared music library. Tracks are automatically grouped into overlapping clusters, with qualifying clusters synchronized to Spotify playlists. These integrations are planned; the current application is a credential-independent interface preview.
+The intended experience: invited community members sign in with a verified email/password account, find a Spotify recording, personalize its tags, and submit it to a shared music library. Tracks are automatically grouped into overlapping clusters, with qualifying clusters synchronized to Spotify playlists. These integrations are planned; the current application is a credential-independent interface preview.
 
 The project aims to turn the musical taste of the community into a collection of continuously evolving playlists.
 
@@ -16,10 +16,10 @@ Tarab Space connects three things:
 
 **Reddit community → Music submissions → Spotify playlists**
 
-A user will authenticate using Reddit, select a Spotify recording, review its metadata and editable tags, and submit it. One track may belong to several clusters and therefore appear in several playlists.
+An invited member will authenticate through Supabase, select a Spotify recording, review its metadata and editable tags, and submit it. One track may belong to several clusters and therefore appear in several playlists.
 
 ```text
-Reddit identity → Shared track library → Overlapping clusters → Spotify playlists
+Username-bound invitation → Email identity → Shared track library → Overlapping clusters → Spotify playlists
 ```
 
 The goal is to create playlists that reflect the musical diversity of the community rather than the taste of a single curator.
@@ -28,8 +28,8 @@ The goal is to create playlists that reflect the musical diversity of the commun
 
 ## 🚀 Planned Features
 
-- 🔐 **Sign in with Reddit**
-- 👤 Associate submissions with authenticated Reddit users
+- 🔐 **Invitation-only membership with Supabase email/password login**
+- 👤 Associate submissions with authenticated platform members
 - 🎵 Submit songs to Tarab Space
 - 🏷️ Assign genres and tags to submissions
 - 🔎 Retrieve song metadata from Spotify
@@ -56,7 +56,7 @@ Spotify metadata stays separate from user-edited tags. Users can remove, edit, o
 
 After a successful database save, the track appears immediately; there is no approval queue. A PostgreSQL uniqueness constraint on Spotify track ID will prevent duplicate library entries even for concurrent submissions. A duplicate submission will point to the existing entry rather than create another.
 
-Different Spotify IDs can represent different releases of the same recording. Cross-release deduplication remains a separate future decision; a title/artist text comparison will not be treated as a reliable unique identity. How later users can propose tag changes to an existing entry also remains to be defined.
+Different Spotify IDs can represent different releases of the same recording. Cross-release deduplication remains a separate future decision; a title/artist text comparison will not be treated as a reliable unique identity. The original contributor and active editors may edit tags; other members see the existing entry and ownership without editing controls. An admin needs the editor role to edit another member's track.
 
 ### 4. Group automatically
 
@@ -96,16 +96,27 @@ Tarab Space starts as a modular monolith. Next.js provides both the frontend (Se
 ```text
 Next.js
    │
-   ├── Reddit API / OAuth
+   ├── Supabase Auth (email/password)
+   ├── Weekly eligibility snapshot import (scraper pending)
    ├── Spotify Web API
    └── Supabase PostgreSQL
 ```
 
-The foundation uses TypeScript strict mode, React, Tailwind CSS, ESLint, pnpm, and Zod. PostgreSQL will be the source of truth; Spotify playlists will be an external synchronized representation. Reddit will provide the primary user identity, rather than Supabase Auth.
+The foundation uses TypeScript strict mode, React, Tailwind CSS, ESLint, pnpm, and Zod. PostgreSQL will be the source of truth; Spotify playlists will be an external synchronized representation. Supabase Auth is now the chosen email/password identity provider; invitations and an independently maintained username allowlist govern platform membership. Reddit OAuth is no longer required.
 
 External integrations will be implemented incrementally. Their boundaries live in `src/lib/reddit`, `src/lib/spotify`, and `src/lib/supabase`. Shared UI components and domain types can be added to `src/components` and `src/types` when needed.
 
-Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, a submission-interface preview at `/submit`, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. OAuth, live Spotify lookup, eligibility checks, database schema, saving, duplicate enforcement, clustering, and playlist synchronization are not implemented.
+Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, a submission-interface preview at `/submit`, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. Versioned database migrations and permission/audit tests live under `supabase/`. Both initial migrations have been applied to the hosted development project; the project owner verified all eight tables have RLS enabled and the three application roles have no private-schema usage. Invitation migration 003 and account/join UI are prepared locally but require deployment and hosted Auth configuration. Live Spotify lookup, music saving, clustering, and playlist synchronization are not implemented.
+
+### Database foundation (applied to development)
+
+The [database guide](supabase/README.md) documents the schema, access boundary, migration workflow, and [SQL verification](supabase/tests/README.md). Migrations cover members, separate editor/admin roles, bans, Spotify track/artist identities, original contributions, editable tags, and transactional audit history. The private schema denies all current application-role access; fixture-based pages remain unchanged.
+
+Contributors and editors can change a track's tags. Admins can assign roles and ban/unban members; admin does not imply editor. Bans override action permissions. Duplicate submissions show the original contributor/time and never transfer ownership. Audit events record who added, edited, or removed tags, along with timestamps and before/after values; role and ban changes are audited as well.
+
+### Invitation update (migration 003 pending)
+
+`/account` and `/join` implement email/password account UI and the invitation workflow. Migration `20261106000300_invitation_membership.sql` adds Auth identity mapping, roster snapshots, username-bound hashed invitations, graph provenance, and membership-checked RPCs. It preserves internal member UUIDs and all existing ownership, roles, bans, and audit history. It has **not** been applied to the hosted project; the original two migrations must remain unchanged.
 
 ### Discover preview
 
@@ -120,28 +131,22 @@ The layout and pages are Server Components; interactive navigation and discovery
 - UI: `src/components/submission/`; the page itself remains a Server Component.
 - Fixtures: `src/lib/demo/tracks.ts`, separate from integration code and eventual domain contracts.
 - Browser-safe Zod validation: `src/lib/submissions/validation.ts`.
-- Preview limits: up to 12 tags, each 1–40 characters after trimming and whitespace normalization. Tags can be removed entirely; duplicate tags are rejected ignoring case, Unicode compatibility differences, and extra spaces. These are initial UI limits, not a database schema.
+- Preview limits: up to 12 tags, each 1–40 characters after trimming and whitespace normalization. Tags can be removed entirely; duplicate tags are rejected ignoring case, Unicode compatibility differences, and extra spaces. The database migrations mirror these limits; see the database guide for Unicode length/collation differences to verify before wiring saving.
 - Full HTTPS Spotify track URLs, including supported `intl-xx` paths and sharing query strings, are recognized. Album, artist, playlist, URI, and shortened-link resolution are deferred.
 - A new tag must be added or cleared before reviewing. Selecting a different recording starts a fresh draft; same-recording selection preserves edits.
 - There are no mock production endpoints, fake successful submissions, external requests, or browser storage. Live lookup and saving remain unavailable until connected.
 
 ---
 
-## 🛡️ Community Access
+## 🛡️ Invitation-based community access
 
-Tarab Space is intended specifically for the **r/syrian-social-space community**.
+Reddit OAuth has been removed from the plan. Every active member can invite someone, regardless of editor/admin roles. The inviter verifies the person outside the app and creates a single-use invitation bound to their Reddit username. The link expires after 48 hours; the inviter or an admin may revoke it. New members use Supabase email/password login and must confirm their email before redemption.
 
-Authentication alone does not necessarily establish whether someone belongs to or participates in the subreddit, so the exact eligibility system is still being designed.
+A private allowlist will be refreshed by a weekly website scrape. Reddit does not expose a full subscriber roster, so the table represents eligibility under our chosen source, not proof of subscription. Matching a typed username alone does not establish Reddit ownership; trust comes from the inviter's external verification. The source URL, allowed access method, and scheduler remain to be specified.
 
-Possible eligibility rules may include factors such as:
+Redemption atomically rechecks the invitation, bound username, verified email account, current eligibility, inviter ban status, and unique membership. Snapshots older than eight days block new onboarding; existing members are not automatically banned when a snapshot changes. A Supabase Auth account without an accepted invitation has no platform privileges.
 
-- Reddit account authentication
-- activity in `r/syrian-social-space`
-- minimum account age
-- previous posts or comments in the subreddit
-- moderation or community-defined requirements
-
-The purpose of these rules would be to keep playlist contributions community-driven while reducing spam and abuse.
+Invitation records retain who invited whom, issue/acceptance timestamps, and revocation attribution for a future graph. Graph data and the eligibility roster are private. See [the invitation guide](src/lib/invitations/README.md) for limits, secure tokens, snapshot import, and deployment requirements.
 
 ---
 
@@ -184,12 +189,18 @@ while still supporting international genres such as rock, metal, jazz, hip-hop, 
 
 ### Phase 2 — Persistence and identity
 
-- [ ] Versioned SQL migrations and database authorization model
-- [ ] Reddit authentication, sessions, and user model
+- [x] Prepare versioned SQL migrations and fail-closed database access model
+- [x] SQL tests for contribution ownership, permissions, bans, and audit history
+- [x] Review and apply migrations to the hosted development project
+- [x] Verify hosted table RLS and denied private-schema usage for app roles
+- [ ] Implement trusted server access after verified Supabase sessions and active-membership checks
+- [ ] Apply invitation migration 003 and configure Supabase email confirmation
+- [ ] Verify invitation signup/sign-in end to end on the hosted development project
 - [ ] Persist unique track submissions with immediate visibility
 - [ ] Connect Discover to stored submissions
-- [ ] Decide who may edit tags on existing entries
-- [ ] Define subreddit eligibility rules before public access
+- [x] Define tag permissions: original contributor or editor
+- [ ] Protected admin dashboard for role assignment and member bans
+- [ ] Configure and validate the weekly scraper source and trusted snapshot importer
 
 ### Phase 3 — Live Spotify lookup
 
@@ -235,7 +246,7 @@ pnpm start
 
 `pnpm start` serves the production build. Health check: `GET /api/health` returns `{"status":"ok","service":"tarab-space"}`.
 
-Next, define versioned database migrations and authorization around the agreed workflow, then connect persistence and identity. Reddit and Spotify credentials, live integrations, and deployment configuration remain deferred. Before deployment, address the existing Next.js security advisory reported by the development/build tooling.
+Next, review/apply migration 003, configure email/password Auth, bootstrap the first real admin, and import the first eligibility snapshot. Verify invitation-based onboarding before connecting music persistence. Spotify credentials/integration and deployment configuration remain deferred. Before deployment, address the existing Next.js security advisory reported by the development/build tooling.
 
 ---
 
@@ -243,11 +254,11 @@ Next, define versioned database migrations and authorization around the agreed w
 
 Copy `.env.example` to `.env.local` when configuring integrations; never commit credentials. All environment files are ignored except `.env.example`.
 
-`src/lib/env.ts` is server-only. Call `getIntegrationEnv("reddit" | "spotify" | "supabase" | "session")` only when the corresponding feature needs it. Missing or invalid values raise an error naming the variables without printing their values. Session configuration requires a secret of at least 32 characters.
+`src/lib/env.ts` is server-only. Call `getIntegrationEnv("spotify" | "supabase")` only when the corresponding feature needs it. Missing or invalid values raise an error naming the variables without printing their values. Supabase Auth manages email/password sessions; Reddit OAuth and a custom session secret are no longer required.
 
-Only `NEXT_PUBLIC_` values may be referenced by browser code. These values are public, including the Supabase publishable key. OAuth client secrets and session secrets must stay on the server. `NEXT_PUBLIC_APP_URL` is reserved for future application links; it is not required by the current page.
+Only `NEXT_PUBLIC_` values may be referenced by browser code. These values are public, including the Supabase publishable key. Spotify client secrets must stay on the server. `NEXT_PUBLIC_APP_URL` is reserved for future application links; it is not required by the current page.
 
-The Supabase constructor is server-only and uses the publishable key with anonymous-role permissions; database authorization and row-level security must be designed before data access is added.
+The Supabase constructor is server-only and uses the publishable key with anonymous-role permissions. The private schema deliberately denies this helper access. Verified Supabase sessions, active invitation-based membership, and a restricted data-access surface are required for every protected operation. Narrow invitation RPCs are prepared in migration 003; general music queries/writes remain unavailable.
 
 ---
 

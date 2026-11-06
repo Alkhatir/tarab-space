@@ -1,0 +1,12 @@
+# Deliberately minimal development Auth deployment profile.
+# Unspecified hosted settings are preserved by `supabase config push`.
+project_id = "tarab-space"
+
+[auth]
+site_url = "http://localhost:3000"
+enable_signup = true
+minimum_password_length = 12
+
+[auth.email]
+enabled = true
+enable_confirmations = true

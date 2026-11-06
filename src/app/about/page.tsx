@@ -11,7 +11,7 @@ export default function AboutPage() {
       <div className="mt-8 space-y-5 text-lg leading-relaxed text-stone-700">
         <p>Tarab Space is a community-driven music space for r/syrian-social-space. The idea is simple: share the music you love and discover what others are listening to.</p>
         <p>From Syrian and Arabic traditions to sounds from everywhere else, there’s room for familiar favorites and unexpected discoveries.</p>
-        <p>This is an early preview. The Discover page uses sample music and illustrative tags. Reddit sign-in, music submissions, and Spotify playlists are planned; they are not available yet.</p>
+        <p>This is an early preview. The Discover page uses sample music and illustrative tags. Community accounts use private invitations and Supabase email/password sign-in. Live music submissions and Spotify playlists are still planned; sample music is not saved.</p>
         <p className="text-sm">Tarab Space is an independent community project, not affiliated with Reddit or Spotify.</p>
       </div>
       <Link href="/" className="mt-10 inline-flex min-h-11 items-center rounded-full bg-teal-950 px-6 py-3 text-sm font-medium text-white hover:bg-teal-800">Explore the selection <span aria-hidden="true" className="ml-3">→</span></Link>

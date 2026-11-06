@@ -1,7 +1,14 @@
 # Supabase boundary
 
-PostgreSQL access and database client helpers belong here. Supabase Auth is not used; Reddit will supply the primary user identity.
+Supabase now supplies both PostgreSQL and email/password Auth. `browser.ts` lazily
+creates a publishable-key client for Auth and the narrow invitation RPC surface.
+It reads only NEXT_PUBLIC variables and adds no service-role credentials.
 
-The server-only `createSupabaseClient()` validates configuration when called. It uses the publishable key with session persistence disabled, so it has anonymous-role permissions. It does not establish a Reddit identity or grant trusted backend access. Define the database authorization model and row-level security before adding queries.
+`server.ts` is still an anonymous data client, not an authenticated session client.
+Do not use it to authorize writes or grant anonymous access to private tables.
 
-No tables, queries, or schema are implemented.
+The first two migrations are applied to development. Migration 003 adds invited
+membership and is pending. Private tables remain inaccessible to app roles;
+only explicitly granted public RPCs derive identity from `auth.uid()` and check
+verified email/membership/ban state. See [the database guide](../../../supabase/README.md)
+and [invitation guide](../invitations/README.md).

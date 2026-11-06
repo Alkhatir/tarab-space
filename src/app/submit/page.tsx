@@ -11,7 +11,7 @@ export default function SubmitPage() {
       <h1 className="mt-4 font-serif text-5xl tracking-tight">Share a little music.</h1>
       <p className="mt-5 text-lg leading-relaxed text-stone-700">Find a recording, make its tags your own, and preview your contribution.</p>
       <aside aria-label="Preview limitations" className="my-8 rounded-xl border border-amber-900/15 bg-amber-50 p-5 text-sm leading-relaxed text-stone-700">
-        <strong>Submission preview only.</strong> All recordings and suggested tags below are samples. Nothing is saved or added to a playlist. Spotify lookup, authentication, and duplicate checks will be connected later.
+        <strong>Submission preview only.</strong> All recordings and suggested tags below are samples. Nothing is saved or added to a playlist. Spotify lookup, authenticated saving, and duplicate checks will be connected later.
       </aside>
       <SubmissionPreview tracks={demoTracks} />
     </div>
