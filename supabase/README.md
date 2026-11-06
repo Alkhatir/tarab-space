@@ -1,8 +1,8 @@
 # Database foundation
 
-Both initial migrations have been applied to the hosted **development** project.
-Music pages still use fixtures. Invitation migration 003 and email/password
-account UI are prepared locally; they are not applied to the hosted project.
+All three migrations have been applied to the hosted **development** project.
+Music pages still use fixtures. Invitation RPCs and the minimal hosted Auth
+profile are deployed; first-member setup and hosted onboarding are not yet tested.
 
 ## Development deployment record
 
@@ -21,7 +21,28 @@ These are owner-reported hosted verification results, not an independent
 connection from this workspace. They do not establish end-to-end authentication,
 Data API behavior, or concurrency correctness. SQL fixtures remain test-only.
 
-## Invitation update — migration 003 pending
+### Verified deployment on 2026-11-07
+
+- Applied `20261106000300_invitation_membership.sql`; all three local/remote
+  migration versions match.
+- Independently queried the hosted database in read-only transactions: all eleven
+  private tables have RLS enabled; `anon`, `authenticated`, and `service_role`
+  have no private-schema USAGE.
+- Verified all six public `tarab_*` RPCs grant execute to `authenticated`, not
+  `anon` or `service_role`, and use security-definer functions with empty search
+  paths. Their internal membership/ban/eligibility guards remain mandatory.
+- Pushed only `hosted-auth.toml` declarations. The single changed property was
+  password minimum length (6 to 12); email signup/confirmation and localhost Site
+  URL already matched. Nine undeclared hosted properties were preserved.
+- A follow-up config diff reports no declared differences.
+- Members, invitations, and roster-import counts are zero. No bootstrap accounts,
+  fixture rows, invitation emails, or scraper jobs were created.
+
+The Next.js application itself is not hosted by Supabase. The development Site
+URL is still localhost; frontend hosting remains a separate step. No Edge
+Function/scraper source exists to deploy yet.
+
+## Invitation update — migration 003 applied to development
 
 The initial two migrations remain unchanged. New migration
 `20261106000300_invitation_membership.sql` replaces the Reddit-OAuth assumption:
@@ -39,7 +60,7 @@ The initial two migrations remain unchanged. New migration
 
 The original eight-table hosted verification below describes migrations 001/002.
 After migration 003 there will be eleven private tables. Verify their RLS and the
-explicit RPC grants as well. This migration is **not deployed** by this change.
+explicit RPC grants as well. This migration was applied on 2026-11-07.
 See [the invitation guide](../src/lib/invitations/README.md) for lifecycle and limits.
 
 ### Minimal hosted Auth deployment profile
@@ -54,7 +75,7 @@ explicit development project reference. Never commit CLI login state or secrets.
 
 ### Hosted Auth configuration and first member
 
-1. Review and apply only pending migration 003 through the established CLI flow.
+1. Migration 003 is applied; use the established CLI flow for future migrations.
 2. Enable Supabase email/password Auth and **email confirmation**, with a
    minimum password length of 12. Set Site URL
    to the actual development origin, e.g. `http://localhost:3000`. Auth confirmation
@@ -227,8 +248,7 @@ No public bootstrap function or hard-coded administrator account exists.
 
 The initial development deployment is complete. For subsequent changes:
 
-1. Review pending migration 003; do not edit either already-applied migration.
-   After 003 is applied, subsequent changes must use new migrations.
+1. All three migrations are applied. Subsequent changes must use new migrations.
 2. Explicitly target the intended development project and preview pending
    changes before pushing through Supabase migration tooling.
 3. Preserve migration history; do not recreate these tables manually in Table
@@ -239,9 +259,9 @@ The initial development deployment is complete. For subsequent changes:
    designed and authorized for that environment. Never run the disposable
    `tests/bootstrap_roles.sql` or `tests/foundation.sql` there.
 
-The project owner performed CLI login, project linking, and migration application
-in their terminal. No hosted connection or schema mutation was performed by the
-assistant. Credentials stay in ignored local configuration or your password
+The project owner performed CLI login, project linking, and the original two
+migrations. With explicit authorization, the assistant applied migration 003 and
+the minimal hosted Auth profile on 2026-11-07 and performed read-only verification. Credentials stay in ignored local configuration or your password
 manager, never migration files.
 
 ## Verification

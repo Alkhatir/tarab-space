@@ -83,16 +83,17 @@ through an explicit database-owner transaction after the first admin is set up.
 
 ## Deployment and limits
 
-Migration `20261106000300_invitation_membership.sql` is prepared locally, **not
-applied** to Supabase. Do not edit migrations 001/002, which are already applied.
+Migration `20261106000300_invitation_membership.sql` was applied to the development
+project on 2026-11-07. All three migration histories match. Do not edit applied
+migrations; use a new migration for later changes.
 See `supabase/README.md` for Auth settings and initial-account bootstrap.
 Existing legacy member records, if any, need a deliberate verified-identity
 backfill migration; runtime identity reassignment is intentionally forbidden.
 
 `/account` supports password sign-in/out and invitation management; `/join`
-supports email-account creation and invitation acceptance. Email confirmation
-must be enabled in Supabase, and Site URL/redirects must match the development
-site. This milestone uses the Supabase SDK's browser session storage; server
+supports email-account creation and invitation acceptance. The minimal hosted Auth profile now matches confirmed email/password signup,
+a 12-character password minimum, and development Site URL `http://localhost:3000`.
+Change the URL deliberately when an application host is configured. This milestone uses the Supabase SDK's browser session storage; server
 components do not infer identity from it. Future server-side mutations need
 verified Auth sessions or membership-checked RPCs, never trusted browser state.
 

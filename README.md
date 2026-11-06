@@ -106,7 +106,7 @@ The foundation uses TypeScript strict mode, React, Tailwind CSS, ESLint, pnpm, a
 
 External integrations will be implemented incrementally. Their boundaries live in `src/lib/reddit`, `src/lib/spotify`, and `src/lib/supabase`. Shared UI components and domain types can be added to `src/components` and `src/types` when needed.
 
-Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, a submission-interface preview at `/submit`, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. Versioned database migrations and permission/audit tests live under `supabase/`. Both initial migrations have been applied to the hosted development project; the project owner verified all eight tables have RLS enabled and the three application roles have no private-schema usage. Invitation migration 003 and account/join UI are prepared locally but require deployment and hosted Auth configuration. Live Spotify lookup, music saving, clustering, and playlist synchronization are not implemented.
+Currently implemented: a shared responsive layout, a Discover homepage with local search and tag filtering, an About page, a submission-interface preview at `/submit`, lazy server-side environment validation, a Supabase client constructor, and `GET /api/health`. Versioned database migrations and permission/audit tests live under `supabase/`. Both initial migrations have been applied to the hosted development project; the project owner verified all eight tables have RLS enabled and the three application roles have no private-schema usage. Invitation migration 003 and the minimal Auth profile were deployed to the development project on 2026-11-07. First-admin bootstrap, initial roster import, and hosted email/onboarding verification remain outstanding. Live Spotify lookup, music saving, clustering, and playlist synchronization are not implemented.
 
 ### Database foundation (applied to development)
 
@@ -114,9 +114,9 @@ The [database guide](supabase/README.md) documents the schema, access boundary, 
 
 Contributors and editors can change a track's tags. Admins can assign roles and ban/unban members; admin does not imply editor. Bans override action permissions. Duplicate submissions show the original contributor/time and never transfer ownership. Audit events record who added, edited, or removed tags, along with timestamps and before/after values; role and ban changes are audited as well.
 
-### Invitation update (migration 003 pending)
+### Invitation update (migration 003 deployed to development)
 
-`/account` and `/join` implement email/password account UI and the invitation workflow. Migration `20261106000300_invitation_membership.sql` adds Auth identity mapping, roster snapshots, username-bound hashed invitations, graph provenance, and membership-checked RPCs. It preserves internal member UUIDs and all existing ownership, roles, bans, and audit history. It has **not** been applied to the hosted project; the original two migrations must remain unchanged.
+`/account` and `/join` implement email/password account UI and the invitation workflow. Migration `20261106000300_invitation_membership.sql` adds Auth identity mapping, roster snapshots, username-bound hashed invitations, graph provenance, and membership-checked RPCs. It preserves internal member UUIDs and all existing ownership, roles, bans, and audit history. It was applied to the development project on 2026-11-07; all three migration histories match. Read-only hosted checks verified RLS on all eleven tables, denied private-schema usage for app roles, and the six intended authenticated-only RPC grants. Applied migrations must remain unchanged.
 
 ### Discover preview
 
@@ -246,7 +246,7 @@ pnpm start
 
 `pnpm start` serves the production build. Health check: `GET /api/health` returns `{"status":"ok","service":"tarab-space"}`.
 
-Next, review/apply migration 003, configure email/password Auth, bootstrap the first real admin, and import the first eligibility snapshot. Verify invitation-based onboarding before connecting music persistence. Spotify credentials/integration and deployment configuration remain deferred. Before deployment, address the existing Next.js security advisory reported by the development/build tooling.
+Next, bootstrap the first real admin and import the first eligibility snapshot. Migration 003 and the minimal hosted Auth settings are already deployed. Verify invitation-based onboarding before connecting music persistence. Spotify credentials/integration and deployment configuration remain deferred. Before deployment, address the existing Next.js security advisory reported by the development/build tooling.
 
 ---
 
@@ -258,7 +258,7 @@ Copy `.env.example` to `.env.local` when configuring integrations; never commit 
 
 Only `NEXT_PUBLIC_` values may be referenced by browser code. These values are public, including the Supabase publishable key. Spotify client secrets must stay on the server. `NEXT_PUBLIC_APP_URL` is reserved for future application links; it is not required by the current page.
 
-The Supabase constructor is server-only and uses the publishable key with anonymous-role permissions. The private schema deliberately denies this helper access. Verified Supabase sessions, active invitation-based membership, and a restricted data-access surface are required for every protected operation. Narrow invitation RPCs are prepared in migration 003; general music queries/writes remain unavailable.
+The Supabase constructor is server-only and uses the publishable key with anonymous-role permissions. The private schema deliberately denies this helper access. Verified Supabase sessions, active invitation-based membership, and a restricted data-access surface are required for every protected operation. Narrow invitation RPCs are deployed by migration 003; general music queries/writes remain unavailable.
 
 ---
 
